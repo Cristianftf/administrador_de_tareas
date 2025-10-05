@@ -12,6 +12,9 @@ function App() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const [reminderDateTime, setReminderDateTime] = useState('');
 
   useEffect(() => {
     loadTasks();
@@ -70,6 +73,36 @@ function App() {
 
   const handleToggleComplete = async (task: Task) => {
     await handleUpdateTask(task.id!, { completed: !task.completed });
+  };
+
+  const handleSetReminder = async (taskId: number, dateTime: string) => {
+    try {
+      const reminderAt = new Date(dateTime).toISOString();
+      const updatedTask = await taskApi.setReminder(taskId, reminderAt);
+      setTasks(tasks.map(task => task.id === taskId ? updatedTask : task));
+      setShowReminderModal(false);
+      setSelectedTaskId(null);
+      setReminderDateTime('');
+      setError(null);
+    } catch (err) {
+      setError('Error al programar el recordatorio');
+      console.error('Error setting reminder:', err);
+    }
+  };
+
+  const openReminderModal = (taskId: number) => {
+    setSelectedTaskId(taskId);
+    setShowReminderModal(true);
+    // Set default to current time + 1 hour
+    const defaultDateTime = new Date();
+    defaultDateTime.setHours(defaultDateTime.getHours() + 1);
+    setReminderDateTime(defaultDateTime.toISOString().slice(0, 16));
+  };
+
+  const closeReminderModal = () => {
+    setShowReminderModal(false);
+    setSelectedTaskId(null);
+    setReminderDateTime('');
   };
 
   const formatDate = (dateString?: string) => {
@@ -146,6 +179,12 @@ function App() {
                     {task.completed ? '✓ Completada' : 'Marcar como completada'}
                   </button>
                   <button
+                    onClick={() => openReminderModal(task.id!)}
+                    className="btn-reminder"
+                  >
+                    Programar Recordatorio
+                  </button>
+                  <button
                     onClick={() => handleDeleteTask(task.id!)}
                     className="btn-delete"
                   >
@@ -156,6 +195,40 @@ function App() {
             ))
           )}
         </div>
+
+        {/* Modal para programar recordatorio */}
+        {showReminderModal && (
+          <div className="modal-overlay" onClick={closeReminderModal}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h3>Programar Recordatorio</h3>
+              <div className="form-group">
+                <label htmlFor="reminderDateTime">Fecha y Hora:</label>
+                <input
+                  id="reminderDateTime"
+                  type="datetime-local"
+                  value={reminderDateTime}
+                  onChange={(e) => setReminderDateTime(e.target.value)}
+                  min={new Date().toISOString().slice(0, 16)}
+                />
+              </div>
+              <div className="modal-actions">
+                <button
+                  onClick={closeReminderModal}
+                  className="btn-secondary"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => handleSetReminder(selectedTaskId!, reminderDateTime)}
+                  className="btn-primary"
+                  disabled={!reminderDateTime}
+                >
+                  Programar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
